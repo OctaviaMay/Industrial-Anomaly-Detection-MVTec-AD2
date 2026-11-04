@@ -1,10 +1,18 @@
-from anomalib.models import Patchcore
+
+import os
+# To prevent windows multiprocessing memory problem before importing anomalib memory
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+from src.config import load_config
+from src.data import get_datamodule
+from src.model import build_model
+
 from anomalib.engine import Engine
 from pathlib import Path
 import json
 
-from src.config import load_config
-from src.data import get_datamodule
+
 
 def train_model():
     # Get config
@@ -15,12 +23,7 @@ def train_model():
 
     # Initialize model
     m = cfg["model"]
-    model = Patchcore(
-        backbone=m["backbone"],
-        layers=m["layers"],
-        coreset_sampling_ratio=m["coreset_sampling_ratio"],
-        pre_trained=True,
-    )
+    model = build_model(m)
     
     data_module = get_datamodule(cfg["data"])
 
