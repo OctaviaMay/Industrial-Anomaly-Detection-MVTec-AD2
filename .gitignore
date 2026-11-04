@@ -1,1 +1,23 @@
-data/, outputs/, *.onnx, *.ckpt
+# Training outputs
+outputs/
+results/
+
+# Model checkpoints and exported models
+*.ckpt
+*.onnx
+*.pth
+*.pt
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Environment
+.venv/
+venv/
+
+# Logs
+*.log
