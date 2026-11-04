@@ -5,5 +5,12 @@ data:
   normal_test_dir : test_public/good
   abnormal_dir : test_public/bad
   mask_dir : test_public/ground_truth/bad
-  batch_size : 16
-  num_workers : 0
+  batch_size : 16   # T4 has 16 GB; drop back to 16 if you get CUDA out of memory
+  num_workers : 0   # Colab has 2 CPU cores, so 2 is the right value
+
+model:
+  backbone: wide_resnet50_2
+  layers: [layer2, layer3]
+  coreset_sampling_ratio: 0.01
+
+output_dir: results/
