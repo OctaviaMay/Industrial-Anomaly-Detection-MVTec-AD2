@@ -14,13 +14,12 @@ from src.config import load_config
 from src.data import get_datamodule
 from src.model import build_model
 
-from anomalib.models import Patchcore
 from anomalib.engine import Engine
-from anomalib.metrics import Evaluator, AUROC, F1Score, AUPRO
+from lightning.pytorch import seed_everything
 
-CKPT = "results/Patchcore/vial/latest/weights/lightning/model.ckpt" # trained model path
 OUTPUT = Path("reports/figures")
 CASES = ["TP", "FN", "FP"]
+
 
 
 def collect_predicted_data(preds):
@@ -72,8 +71,11 @@ def evaluate_model():
     # Get config
     cfg = load_config()
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    for old in OUTPUT.glob("*.png"): # Clear all previous saved images
+        old.unlink()
 
     # Get data module
+    seed_everything(42)
     data_module = get_datamodule(cfg["data"])
 
     # Build model
@@ -83,18 +85,21 @@ def evaluate_model():
     # Aggregate metrics
     metrics =  engine.test(model=model,
                 datamodule= data_module,
-                ckpt_path= CKPT)
+                ckpt_path= cfg["export"]["ckpt"])
     with open("reports/metrics.json","w") as f:
         json.dump(metrics[0],f,indent=2)
 
     # Per-image predictions
     preds = engine.predict(model= model,
                 dataloaders= data_module.test_dataloader(),
-                ckpt_path= CKPT)
+                ckpt_path= cfg["export"]["ckpt"])
     df,maps = collect_predicted_data(preds)
 
-    # Save predicted result
+    # Save predicted result and case count
     df.to_csv("reports/per_image_predictions.csv", index=False)
+    case_count = df.case.value_counts().to_dict()
+    with open("reports/case_counts.json","w") as f:
+        json.dump(case_count, f, indent=2)
     print(df.case.value_counts())  
 
     # Plot predicted result

@@ -10,6 +10,7 @@ from src.model import build_model
 
 from anomalib.engine import Engine
 from pathlib import Path
+from lightning.pytorch import seed_everything
 import json
 
 
@@ -24,7 +25,8 @@ def train_model():
     # Initialize model
     m = cfg["model"]
     model = build_model(m)
-    
+
+    seed_everything(42)
     data_module = get_datamodule(cfg["data"])
 
     # Train model using the engine
