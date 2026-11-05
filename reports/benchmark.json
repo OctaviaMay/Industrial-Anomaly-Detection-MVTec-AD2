@@ -1,0 +1,11 @@
+{
+  "images": 40,
+  "threads": 4,
+  "pytorch_ms_per_image": 437.4,
+  "onnx_ms_per_image": 280.3,
+  "speedup": 1.56,
+  "max_score_diff": 3.159046173095703e-06,
+  "max_map_diff": 7.927417755126953e-06,
+  "scores_match": true,
+  "onnx_size_mb": 0.4
+}
