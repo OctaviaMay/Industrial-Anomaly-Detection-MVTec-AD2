@@ -14,3 +14,8 @@ model:
   coreset_sampling_ratio: 0.01
 
 output_dir: results/
+
+export:
+  ckpt: results/Patchcore/vial/latest/weights/lightning/model.ckpt
+  root: results/export
+  input_size: [256,256]
