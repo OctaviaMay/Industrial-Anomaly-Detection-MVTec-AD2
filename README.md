@@ -2,6 +2,13 @@
 
 Unsupervised defect detection and localization on the **MVTec AD 2 – Vial** category using **PatchCore** (PyTorch / anomalib), with **ONNX export** and a **CPU latency benchmark**.
 
+![Defect detected under shifted lighting: input, ground truth, anomaly map](reports/figures/TP_000_shift_3.png)
+
+**At a glance**
+- **Detection:** image AUROC **0.934**, pixel AU-PRO **0.837** on the public test set (71 images).
+- **Decisions:** all 53 defective tubes caught (zero escapes) at a **56% false reject rate** on good tubes. Lighting changes cause most of the false rejects.
+- **Deployment:** ONNX Runtime runs **1.56× faster** than PyTorch on a laptop CPU (280 ms / image), with outputs matching to ~10⁻⁶.
+
 ## Why unsupervised?
 
 On a real production line, defects are rare and new defect types appear without warning. Collecting and labelling enough defect examples for a supervised classifier is slow and never complete.
@@ -17,8 +24,8 @@ This project uses the **Vial** category: semi-transparent plastic sample tubes w
 | Split | Used for |
 |---|---|
 | `train/good` | Training (defect-free images only) |
-| `test_public/good` | Testing: 18 good tubes |
-| `test_public/bad` + `ground_truth` | Testing: 53 defective tubes with pixel masks |
+| `test_public/good` | Testing: 18 good images (5 physical tubes, each captured under several lighting conditions) |
+| `test_public/bad` + `ground_truth` | Testing: 53 defective images with pixel masks |
 
 The private test sets have no public labels, so they are not used.
 
@@ -37,9 +44,10 @@ The private test sets have no public labels, so they are not used.
 | Metric | Value |
 |---|---|
 | Image AUROC | **0.934** |
-| Image F1 | 0.914 |
 | Pixel AUROC | 0.917 |
 | Pixel AU-PRO | **0.837** |
+
+These numbers come from the final checkpoint, evaluated with `src/evaluate.py` (seed 42) and saved in `reports/metrics.json`. `reports/baseline_metrics.json` holds the test metrics from an earlier training run (image AUROC 0.893, pixel AU-PRO 0.853). The gap shows how much results vary between runs (see [Limitations](#limitations)).
 
 **What the metrics mean:**
 - **Image AUROC** measures how well defective tubes are ranked above good ones. It doesn't depend on a threshold.
@@ -56,7 +64,14 @@ The private test sets have no public labels, so they are not used.
 | Good tubes rejected (FP) | 10 / 18 | **56% false reject rate** |
 | Good tubes passed (TN) | 8 / 18 | |
 
-The model catches every defective tube, but rejects more than half of the good ones. Image AUROC of 0.93 shows the features separate good and defective tubes well overall. The false rejects have two causes: the automatically chosen threshold, and the model’s sensitivity to lighting changes. See [Example cases](#example-cases).
+The model catches every defective tube, but rejects more than half of the good ones. Image AUROC of 0.93 shows the features separate good and defective tubes well overall. The false rejects have two main causes: the automatically chosen threshold, and the model’s sensitivity to lighting changes. See [Example cases](#example-cases).
+
+| Lighting (good images) | False rejects |
+|---|---|
+| Regular | 1 / 3 |
+| Non-standard (shifted, over-/underexposed) | 9 / 15 |
+
+**Why F1 is not the headline metric:** image F1 at this threshold is 0.914 (precision 0.84, recall 1.00). It looks high only because 53 of the 71 test images are defective. The false reject rate shows the real cost on good parts.
 
 In production, the operating point would be chosen explicitly, based on the cost of an escape (a defect reaching the customer) versus a false reject (yield loss). See [Limitations](#limitations).
 
@@ -72,7 +87,7 @@ The TP example was also captured under shifted lighting: the defect is detected 
 
 **Observations:**
 - **Correct detections:** the anomaly map concentrates on the annotated defect region.
-- **False alarms are caused by lighting changes.** All three of the highest-scoring false alarms are good tubes captured under non-standard lighting (underexposed, overexposed, shifted). The anomaly map activates on the background and label region rather than on a specific defect, and the underexposed tube scores highest (0.915). PatchCore treats illumination changes as anomalies, which is the robustness challenge MVTec AD 2 was designed to expose.
+- **Most false alarms come from lighting changes.** 9 of the 10 false alarms, including the three highest-scoring ones, are good tubes captured under non-standard lighting (underexposed, overexposed, shifted). One good tube under regular lighting (`003_regular`) is also rejected, so lighting is not the only cause. The anomaly map activates on the background and label region rather than on a specific defect, and the underexposed tube scores highest (0.915). PatchCore treats illumination changes as anomalies, which is the robustness challenge MVTec AD 2 was designed to expose.
 - **Resolution:** at 256 × 256, very small defects cover only a few pixels, which limits localization precision.
 
 ## Deployment: ONNX export and CPU benchmark
@@ -109,7 +124,8 @@ The exported model gives the same results as the PyTorch model.
 │   ├── export_onnx.py         # ONNX export
 │   └── benchmark.py           # PyTorch vs ONNX Runtime: output check + latency
 └── reports/
-    ├── metrics.json
+    ├── baseline_metrics.json  # test metrics from an earlier training run
+    ├── metrics.json           # final reported metrics
     ├── case_counts.json
     ├── per_image_predictions.csv
     ├── benchmark.json
@@ -134,8 +150,10 @@ python -m src.benchmark      # PyTorch vs ONNX Runtime latency + output check
 
 ## Limitations
 
-- **Lighting sensitivity:** good tubes captured under non-standard lighting are flagged as anomalous. The training set does not cover enough illumination variation for PatchCore to treat it as normal.
+- **Small good-image test set:** the 18 good test images come from only 5 physical tubes, so the false reject rate has wide uncertainty.
+- **Lighting sensitivity:** good tubes captured under non-standard lighting are often flagged as anomalous. The training set does not cover enough illumination variation for PatchCore to treat it as normal.
 - **Threshold:** the threshold is anomalib's automatic choice, partly based on a validation split drawn from the test set. Across unseeded runs, the false reject rate varied between 55% and 72%, while defect detection stayed at 52–53 of 53.
+- **Run-to-run variation:** image AUROC was 0.893 in an earlier training run and 0.934 in the final run. Reporting mean ± std over several seeds is a next step.
 - **Single category and public test set only:** no evaluation-server submission.
 - **Resolution:** the 256 × 256 input limits detection of very small defects.
 - **Fixed ONNX batch size:** the exported model accepts batches of exactly 2.
